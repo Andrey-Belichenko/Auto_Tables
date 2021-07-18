@@ -1,10 +1,20 @@
 # -*- coding: utf-8 -*-
 import os
+import datetime
 import logging as logger
 import sqlite3
 from sqlite3 import Error
 import pandas as pd
 import openpyxl as op
+from openpyxl.styles import PatternFill, Border, Side, Alignment, Font
+
+
+# добавление текущей даты к названию таблицы
+def rename_table(name_of_table):
+    name_of_table = name_of_table.replace(".xlsx", "")
+    name_of_table = name_of_table + "_" + str(datetime.datetime.now().date())
+    name_of_table = name_of_table + ".xlsx"
+    return name_of_table
 
 
 # Создание файла для записи логов
@@ -120,6 +130,10 @@ def generate_products_xlsx(frame_of_tables, name_of_table, path='.'):
         logger.info(msg=f'Table {name_of_table} was created')
     else:
         logger.info(msg=f'{name_of_table} already created')
+        name_of_table = rename_table(name_of_table)
+        logger.info(msg=f'{name_of_table} create table with now date and time in name')
+        wb = op.Workbook()
+        wb.save(filename=name_of_table)
 
     new_string = ""
     list_of_names = frame_of_tables['Товары'].values.tolist()
@@ -166,6 +180,7 @@ def generate_products_xlsx(frame_of_tables, name_of_table, path='.'):
     df_to_save[['Товары', 'Количество']].to_excel(name_of_table, index=False)
 
     logger.info(msg=f'data was saved to {name_of_table}')
+    make_table_style_products_xlsx(name_of_table)
     # возврат в корневую директорию проекта
     os.chdir("../")
 
@@ -205,6 +220,10 @@ def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
         logger.info(msg=f'Table {name_of_table} was created')
     else:
         logger.info(msg=f'{name_of_table} already created')
+        name_of_table = rename_table(name_of_table)
+        logger.info(msg=f'{name_of_table} create table with now date and time in name')
+        wb = op.Workbook()
+        wb.save(filename=name_of_table)
 
     shape = frame_of_tables.shape
     len_of_dataframe = shape[0]
@@ -222,6 +241,7 @@ def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
     data_frame_parcels.to_excel(name_of_table, index=False)
 
     logger.info(msg=f'data was saved to {name_of_table}')
+    make_table_style_parcels_xlsx(name_of_table)
     os.chdir("../")
 
 
@@ -326,15 +346,71 @@ def create_sqlite_table(conn):
 
 
 # приведение таблицы товары к соответствующему виду
-def make_table_style_products_xlsx(name, path='.'):
-    os.chdir(path)
+def make_table_style_products_xlsx(name):
+    work_book = op.load_workbook(name)
+    col_letters = ['A', 'B']  # список букв колонок
+    sheet = work_book.active
+    for letter in col_letters:
+        if letter == 'A':
+            # изменение щирины колонки A
+            sheet.column_dimensions[letter].width = 130
 
-    print()
+    work_book.save(name)
 
 
 # приведение таблицы посылки к соответствующему виду
-#def make_table_style_parcels_xlsx(name, path='.'):
-#    print()
+def make_table_style_parcels_xlsx(name):
+    work_book = op.load_workbook(name)
+    zero_letters = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'R', 'M', 'N', 'O',
+                    'P', 'U', 'V', 'X', 'Y']                                # названия столбцов с шириной 0
+    col_letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
+                   'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']   # список букв колонок
+
+    thin = Side(border_style="thin", color="000000")
+
+    sheet = work_book.active
+    for letter in col_letters:
+        # изменение ширины столбца взависимости от его буквы
+        if letter in zero_letters:
+            sheet.column_dimensions[letter].width = 0.01
+        if letter == 'A':
+            sheet.column_dimensions[letter].width = 17.00
+        if letter == 'B':
+            sheet.column_dimensions[letter].width = 6.33
+        if letter == 'L':
+            sheet.column_dimensions[letter].width = 60.33
+        if letter == 'Q':
+            sheet.column_dimensions[letter].width = 15.89
+        if letter == 'R':
+            sheet.column_dimensions[letter].width = 15.89
+        if letter == 'S':
+            sheet.column_dimensions[letter].width = 13.11
+        if letter == 'T':
+            sheet.column_dimensions[letter].width = 13.11
+        if letter == 'W':
+            sheet.column_dimensions[letter].width = 14.33
+        if letter == 'Z':
+            sheet.column_dimensions[letter].width = 14.33
+
+        for cell in sheet[letter]:
+            # задача общих параметров для всех ячеек
+            cell.border = Border(top=thin, left=thin, right=thin, bottom=thin)
+            cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+
+    for index in range(sheet.max_row):
+        # настройка ширины для строк
+        sheet.row_dimensions[index].height = 43.2
+
+    # сдесь выделяем первую строку для настройки особых параметров
+    first_row = sheet[1]
+    sheet.row_dimensions[1].height = 15
+    for cell in first_row:
+        # настройка заливки цвет и тип
+        cell.fill = PatternFill(start_color="808080", end_color="808080", fill_type="solid")
+        # настройка шрифта жирность и цвет
+        cell.font = Font(color="000000", bold=True)
+
+    work_book.save(name)
 
 
 if __name__ == '__main__':
