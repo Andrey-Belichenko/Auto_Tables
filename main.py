@@ -87,12 +87,12 @@ def parsing_tables(tables_list, path='.'):
                 for cell in row:
                     if cell.value is not None:
                         if cell.value == "":
-                            dictionary_to_write[list_of_headers[index_of_headers]] = "None"
+                            dictionary_to_write[list_of_headers[index_of_headers]] = ""
                         else:
                             dictionary_to_write[list_of_headers[index_of_headers]] = cell.value
                     index_of_headers += 1
                     dictionary_to_write["Статус"] = table
-    # ignore_index=True для того что бы запись дополнительно не индексировалаь (не добавлялся индекс в начало)
+                # ignore_index=True для того что бы запись дополнительно не индексировалаь (не добавлялся индекс в начало)
                 frame_of_tables = frame_of_tables.append(dictionary_to_write, ignore_index=True)
     # frame_of_tables["Имя таблицы"] = list_of_tabs
     logger.info("large shared table was generated :")
@@ -174,6 +174,7 @@ def generate_products_xlsx(frame_of_tables, name_of_table, path='.'):
         # ignore_index=True для того что бы запись дополнительно не индексировалаь (не добавлялся индекс в начало)
         df_to_save = df_to_save.append(dictionary_to_write, ignore_index=True)
 
+
     logger.info(df_to_save)
     logger.info("table goods was generated")
     # index=False для записи в excel без доп. индексов
@@ -192,18 +193,32 @@ def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
     # | Сумма заказа| Скидка магазина | Оплачено клиентом | Сумма возврата | Возвраты | Товары
     # | Артикул | Id товара | Примечяние заказа (покупателя) | Примечание заказа (продавца) | Имя получателя
     # | Штат/провинция | Страна | Город | Телефон | Номер трекинга
-    list_of_headers = ["Номер заказа", "Статус", "Время создания заказа", "Время оплаты", "Стоимость товаров, Руб",
-                       "Стоимость доставки, Руб", "Сумма заказа, Руб", "Скидка магазина, Руб", "Оплачено клиентом, Руб",
-                       "Сумма возврата, Руб", "Возвраты", "Товары", "Артикул", "Id товаров",
-                       "Примечания к заказу (покупателя)", "Примечания к заказу (продавца)", "Имя получателя",
-                       "Страна", "Штат/провинция", "Город", "Адрес", "Индекс", "Телефон",
-                       "Способ доставки", "Отгрузка истекает", "Трекинг номер"]
+
+    status_dict = {"info@vorobey-club.ru": 0,
+                   "sadovyy-ioj@mail.ru": 1,
+                   "hunting-club-store@mail.ru": 2,
+                   "vorobey-club1@bk.ru": 3,
+                   "vorobey-club3@bk.ru": 4,
+                   "ammunition-store@mail.ru": 5}
+
+    list_of_headers = ["Номер заказа", "Статус", "Товары", "Имя получателя",
+                       "Штат/провинция", "Город", "Телефон", "Трекинг номер"]
+
+    output_list = ["Номер заказа", "Статус", "Товары", "Количество",
+                   "Имя получателя", "Штат/провинция", "Город", "Телефон", "Номер трекинга"]
+
+    index_list = []
+    len_list = []
+    count_list = []
 
     template_dict = {header: list() for header in list_of_headers}
 
     dictionary_to_write = {header: 0 for header in list_of_headers}
 
     data_frame_parcels = pd.DataFrame(template_dict)
+
+    dict_to_out = {header: list() for header in output_list}
+    out_df = pd.DataFrame(dict_to_out)
 
     if not os.path.exists(path):
         os.mkdir(path)
@@ -236,12 +251,71 @@ def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
         # ignore_index=True для того что бы запись дополнительно не индексировалаь (не добавлялся индекс в начало)
         data_frame_parcels = data_frame_parcels.append(dictionary_to_write, ignore_index=True)
 
+    for index in range(len(frame_of_tables.index)):
+        obj = frame_of_tables["Товары"][index]
+        if obj.count('\n') > 0:
+            obj_list = obj.split('\n')
+            len_list.append(index+len(obj_list))
+            for one in obj_list:
+                name = one[4:one.find("- Количество: ")]
+                # print(name)
+                num = one[one.find("Количество: ") + len("Количество: "):]
+                num = num[:num.find(" ")]
+                status = status_dict[(frame_of_tables["Статус"][index].split())[0]]
+                # print(num)
+                dict_to_out["Товары"].append(name)
+                dict_to_out["Количество"].append(num)
+                dict_to_out["Номер заказа"].append(frame_of_tables["Номер заказа"][index])
+                dict_to_out["Статус"].append(status)
+                dict_to_out["Имя получателя"].append(frame_of_tables["Имя получателя"][index])
+                dict_to_out["Штат/провинция"].append(frame_of_tables["Штат/провинция"][index])
+                dict_to_out["Город"].append(frame_of_tables["Город"][index])
+                dict_to_out["Телефон"].append(frame_of_tables["Телефон"][index])
+                dict_to_out["Номер трекинга"].append(frame_of_tables["Трекинг номер"][index])
+
+        else:
+            name = obj[4:obj.find("- Количество: ")]
+            num = obj[obj.find("Количество: ") + len("Количество: "):]
+            num = num[:num.find(" ")]
+            status = status_dict[(frame_of_tables["Статус"][index].split())[0]]
+
+            dict_to_out["Товары"].append(name)
+            dict_to_out["Количество"].append(num)
+            dict_to_out["Статус"].append(status)
+            dict_to_out["Номер заказа"].append(frame_of_tables["Номер заказа"][index])
+            dict_to_out["Имя получателя"].append(frame_of_tables["Имя получателя"][index])
+            dict_to_out["Штат/провинция"].append(frame_of_tables["Штат/провинция"][index])
+            dict_to_out["Город"].append(frame_of_tables["Город"][index])
+            dict_to_out["Телефон"].append(frame_of_tables["Телефон"][index])
+            dict_to_out["Номер трекинга"].append(frame_of_tables["Трекинг номер"][index])
+
+    out_df = pd.DataFrame(dict_to_out)
+    old_order_id = ""
+    old_flag = 0
+    # генерация списка номеров строк для обединениия
+    for index in range(len(out_df["Номер заказа"])):
+        order_id = out_df["Номер заказа"][index]
+        if order_id == old_order_id and old_flag == 0:
+            index_list.append(index+1)
+            old_flag = 1
+        if order_id != old_order_id and old_flag == 1:
+            index_list.append(index+1)
+            old_flag = 0
+        old_order_id = order_id
+
+    out_df = out_df.reset_index(drop=True)
+
+    for index in range(len(out_df['Количество'])):
+        if int(out_df['Количество'][index]) > 1:
+            count_list.append(index)
+
     logger.info(msg=f'Save table as {name_of_table}')
     # index=False для записи в excel без доп. индексов
-    data_frame_parcels.to_excel(name_of_table, index=False)
+    out_df.to_excel(name_of_table, index=False)
 
     logger.info(msg=f'data was saved to {name_of_table}')
-    make_table_style_parcels_xlsx(name_of_table)
+    make_merge(index_list, name_of_table)
+    make_table_style_parcels_xlsx(name_of_table, count_list)
     os.chdir("../")
 
 
@@ -359,38 +433,16 @@ def make_table_style_products_xlsx(name):
 
 
 # приведение таблицы посылки к соответствующему виду
-def make_table_style_parcels_xlsx(name):
+def make_table_style_parcels_xlsx(name, count_list):
     work_book = op.load_workbook(name)
-    zero_letters = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'R', 'M', 'N', 'O',
-                    'P', 'U', 'V', 'X', 'Y']                                # названия столбцов с шириной 0
-    col_letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
-                   'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']   # список букв колонок
-
+    # col_letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']  # список букв колонок
+    col_letters = {'A': 16.44, 'B': 1, 'C': 57, 'D': 2.56, 'E': 15.89, 'F': 15.89, 'G': 13.11, 'H': 14.33, 'I': 14.33}
     thin = Side(border_style="thin", color="000000")
 
     sheet = work_book.active
-    for letter in col_letters:
+    for letter in col_letters.keys():
         # изменение ширины столбца взависимости от его буквы
-        if letter in zero_letters:
-            sheet.column_dimensions[letter].width = 0.01
-        if letter == 'A':
-            sheet.column_dimensions[letter].width = 17.00
-        if letter == 'B':
-            sheet.column_dimensions[letter].width = 6.33
-        if letter == 'L':
-            sheet.column_dimensions[letter].width = 60.33
-        if letter == 'Q':
-            sheet.column_dimensions[letter].width = 15.89
-        if letter == 'R':
-            sheet.column_dimensions[letter].width = 15.89
-        if letter == 'S':
-            sheet.column_dimensions[letter].width = 13.11
-        if letter == 'T':
-            sheet.column_dimensions[letter].width = 13.11
-        if letter == 'W':
-            sheet.column_dimensions[letter].width = 14.33
-        if letter == 'Z':
-            sheet.column_dimensions[letter].width = 14.33
+        sheet.column_dimensions[letter].width = col_letters[letter] + 0.8
 
         for cell in sheet[letter]:
             # задача общих параметров для всех ячеек
@@ -410,15 +462,31 @@ def make_table_style_parcels_xlsx(name):
         # настройка шрифта жирность и цвет
         cell.font = Font(color="000000", bold=True)
 
+    for index in count_list:
+        sheet['D'+str(index)].font = Font(bold=True)
+
+    work_book.save(name)
+
+
+# создание обединенных ячеек таблице
+def make_merge(index_list, name):
+    # Буквы столбцов в которых одинаковые данные должны объединяться
+    merge_letters = ['A', 'B', 'E', 'F', 'G', 'H', 'I', 'J']
+    work_book = op.load_workbook(name)
+    sheet = work_book.active
+    for letter in merge_letters:
+        for index in range(0, len(index_list), 2):
+            sheet.merge_cells(letter+str(index_list[index])+':'+letter+str(index_list[index+1]))
     work_book.save(name)
 
 
 if __name__ == '__main__':
     create_logger("logs.log", "logger")
+    logger.info("Start logging")
     list_of_tables = get_tables(".xlsx", "input")
     frame_of_tables_g = parsing_tables(list_of_tables, "input")
     generate_products_xlsx(frame_of_tables_g, "Товары.xlsx", "output")
-    generate_parcels_xlsx(frame_of_tables_g,  "Посылки.xlsx", "output")
+    generate_parcels_xlsx(frame_of_tables_g, "Посылки.xlsx", "output")
     connect, db_name = generate_sqlite("out.db", "output")
     create_sqlite_table(connect)
     dataframe_to_sqlite(frame_of_tables_g, connect)
