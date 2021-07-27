@@ -302,9 +302,10 @@ def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
             index_list.append(index+1)
             old_flag = 0
         old_order_id = order_id
-
+    # востановление порядка индексов после вставок датафреймов
     out_df = out_df.reset_index(drop=True)
 
+    # собираем список индексов которые надо выделить жирным
     for index in range(len(out_df['Количество'])):
         if int(out_df['Количество'][index]) > 1:
             count_list.append(index)
@@ -314,8 +315,11 @@ def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
     out_df.to_excel(name_of_table, index=False)
 
     logger.info(msg=f'data was saved to {name_of_table}')
+
     make_merge(index_list, name_of_table)
+
     make_table_style_parcels_xlsx(name_of_table, count_list)
+
     os.chdir("../")
 
 
@@ -462,8 +466,10 @@ def make_table_style_parcels_xlsx(name, count_list):
         # настройка шрифта жирность и цвет
         cell.font = Font(color="000000", bold=True)
 
+    # тут выделяем жирным количество больше 1
     for index in count_list:
-        sheet['D'+str(index)].font = Font(bold=True)
+        # index + 2 тк из-за наложения форматоыв индекс чутьчуть плывет
+        sheet['D'+str(index+2)].font = Font(bold=True)
 
     work_book.save(name)
 
@@ -475,7 +481,9 @@ def make_merge(index_list, name):
     work_book = op.load_workbook(name)
     sheet = work_book.active
     for letter in merge_letters:
+        # выбираем из списка индексы с шагом 2 тк каждый 2 закрывающий
         for index in range(0, len(index_list), 2):
+            # строка обединениея передаем в sheet.merge_cells строку вида "БУКВА+ЦИФРА:БУКВА+ЦИФРА" ("A1:A4")
             sheet.merge_cells(letter+str(index_list[index])+':'+letter+str(index_list[index+1]))
     work_book.save(name)
 
