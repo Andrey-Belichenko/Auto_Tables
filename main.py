@@ -174,10 +174,11 @@ def generate_products_xlsx(frame_of_tables, name_of_table, path='.'):
         # ignore_index=True для того что бы запись дополнительно не индексировалаь (не добавлялся индекс в начало)
         df_to_save = df_to_save.append(dictionary_to_write, ignore_index=True)
 
-
     logger.info(df_to_save)
     logger.info("table goods was generated")
     # index=False для записи в excel без доп. индексов
+    df_to_save = df_to_save[['Товары', 'Количество']].sort_values(by='Товары')
+
     df_to_save[['Товары', 'Количество']].to_excel(name_of_table, index=False)
 
     logger.info(msg=f'data was saved to {name_of_table}')
@@ -210,12 +211,15 @@ def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
     index_list = []
     len_list = []
     count_list = []
+    index_phone_list = []
 
     template_dict = {header: list() for header in list_of_headers}
 
     dictionary_to_write = {header: 0 for header in list_of_headers}
-
     data_frame_parcels = pd.DataFrame(template_dict)
+
+    out_template_dict = {header: list() for header in output_list}
+    temp_df = pd.DataFrame(out_template_dict)
 
     dict_to_out = {header: list() for header in output_list}
     out_df = pd.DataFrame(dict_to_out)
@@ -292,7 +296,9 @@ def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
     out_df = pd.DataFrame(dict_to_out)
     old_order_id = ""
     old_flag = 0
+
     # генерация списка номеров строк для обединениия
+    logger.info("generate list of index to marge")
     for index in range(len(out_df["Номер заказа"])):
         order_id = out_df["Номер заказа"][index]
         if order_id == old_order_id and old_flag == 0:
@@ -302,10 +308,42 @@ def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
             index_list.append(index+1)
             old_flag = 0
         old_order_id = order_id
+
     # востановление порядка индексов после вставок датафреймов
     out_df = out_df.reset_index(drop=True)
 
+    # далее премещаем записи с одинаковыми номерами телефонов друг к другу
+    list_of_index = pars_coll_numbers(out_df)
+    dictionary_to_write = {header: 0 for header in output_list}
+    logger.info("make dataframe by phone numbers")
+    for index in list_of_index:
+        dictionary_to_write["Номер заказа"] = out_df["Номер заказа"][index]
+        dictionary_to_write["Статус"] = out_df["Статус"][index]
+        dictionary_to_write["Товары"] = out_df["Товары"][index]
+        dictionary_to_write["Количество"] = out_df["Количество"][index]
+        dictionary_to_write["Имя получателя"] = out_df["Имя получателя"][index]
+        dictionary_to_write["Штат/провинция"] = out_df["Штат/провинция"][index]
+        dictionary_to_write["Город"] = out_df["Город"][index]
+        dictionary_to_write["Телефон"] = out_df["Телефон"][index]
+        dictionary_to_write["Номер трекинга"] = out_df["Номер трекинга"][index]
+        temp_df = temp_df.append(dictionary_to_write, ignore_index=True)
+    out_df = temp_df
+
+    # собираем индексы ячеек столбца трек-номер который следует выделить жирным
+    old_phone = ""
+    for index in range(len(out_df["Телефон"])):
+        phone = out_df["Телефон"][index]
+        if phone == old_phone and old_flag == 0:
+            index_phone_list.append(index+1)
+            old_flag = 1
+        if phone != old_phone and old_flag == 1:
+            index_phone_list.append(index+1)
+            old_flag = 0
+        old_phone = phone
+    out_df = out_df.reset_index(drop=True)
+
     # собираем список индексов которые надо выделить жирным
+    logger.info("generate list of index to count")
     for index in range(len(out_df['Количество'])):
         if int(out_df['Количество'][index]) > 1:
             count_list.append(index)
@@ -318,7 +356,7 @@ def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
 
     make_merge(index_list, name_of_table)
 
-    make_table_style_parcels_xlsx(name_of_table, count_list)
+    make_table_style_parcels_xlsx(name_of_table, count_list, index_phone_list)
 
     os.chdir("../")
 
@@ -437,7 +475,7 @@ def make_table_style_products_xlsx(name):
 
 
 # приведение таблицы посылки к соответствующему виду
-def make_table_style_parcels_xlsx(name, count_list):
+def make_table_style_parcels_xlsx(name, count_list, index_phone_list):
     work_book = op.load_workbook(name)
     # col_letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']  # список букв колонок
     col_letters = {'A': 16.44, 'B': 1, 'C': 57, 'D': 2.56, 'E': 15.89, 'F': 15.89, 'G': 13.11, 'H': 14.33, 'I': 14.33}
@@ -467,9 +505,15 @@ def make_table_style_parcels_xlsx(name, count_list):
         cell.font = Font(color="000000", bold=True)
 
     # тут выделяем жирным количество больше 1
+    logger.info("make count bold")
     for index in count_list:
         # index + 2 тк из-за наложения форматоыв индекс чутьчуть плывет
         sheet['D'+str(index+2)].font = Font(bold=True)
+
+    # тут выделяем жирнвм трек-номера посылок с одинаковыми номерами телефонов
+    logger.info("make track-number bold")
+    for index in index_phone_list:
+        sheet['I' + str(index)].font = Font(bold=True)
 
     work_book.save(name)
 
@@ -480,12 +524,32 @@ def make_merge(index_list, name):
     merge_letters = ['A', 'B', 'E', 'F', 'G', 'H', 'I', 'J']
     work_book = op.load_workbook(name)
     sheet = work_book.active
+    logger.info("make cells merge")
     for letter in merge_letters:
         # выбираем из списка индексы с шагом 2 тк каждый 2 закрывающий
         for index in range(0, len(index_list), 2):
             # строка обединениея передаем в sheet.merge_cells строку вида "БУКВА+ЦИФРА:БУКВА+ЦИФРА" ("A1:A4")
             sheet.merge_cells(letter+str(index_list[index])+':'+letter+str(index_list[index+1]))
     work_book.save(name)
+
+
+# сортировка списка по наличию одинаковых номеров телефонов
+def pars_coll_numbers(out_df):
+    phone_list = out_df['Телефон']
+    phone_list = phone_list.to_list()
+    list_of_index = []
+    temp = []
+    # создаем список телефонов без повторений
+    for x in phone_list:
+        if x not in temp:
+            temp.append(x)
+    phone_set = temp
+    # создание списка индексов под сдвиг
+    for phone_number in phone_set:
+        for index in range(len(phone_list)):
+            if phone_number == phone_list[index]:
+                list_of_index.append(index)
+    return list_of_index
 
 
 if __name__ == '__main__':
