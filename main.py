@@ -554,7 +554,6 @@ def pars_coll_numbers(out_df):
 
 if __name__ == '__main__':
     create_logger("logs.log", "logger")
-    logger.info("Start logging")
     list_of_tables = get_tables(".xlsx", "input")
     frame_of_tables_g = parsing_tables(list_of_tables, "input")
     generate_products_xlsx(frame_of_tables_g, "Товары.xlsx", "output")
