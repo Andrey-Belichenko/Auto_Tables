@@ -195,12 +195,12 @@ def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
     # | Артикул | Id товара | Примечяние заказа (покупателя) | Примечание заказа (продавца) | Имя получателя
     # | Штат/провинция | Страна | Город | Телефон | Номер трекинга
 
-    status_dict = {"info@vorobey-club.ru": 0,
-                   "sadovyy-ioj@mail.ru": 1,
-                   "hunting-club-store@mail.ru": 2,
-                   "vorobey-club1@bk.ru": 3,
-                   "vorobey-club3@bk.ru": 4,
-                   "ammunition-store@mail.ru": 5}
+    status_dict = {"info@vorobey-club.ru": 1,
+                   "sadovyy-ioj@mail.ru": 2,
+                   "hunting-club-store@mail.ru": 4,
+                   "vorobey-club1@bk.ru": 6,
+                   "vorobey-club3@bk.ru": 7,
+                   "ammunition-store@mail.ru": 8}
 
     list_of_headers = ["Номер заказа", "Статус", "Товары", "Имя получателя",
                        "Штат/провинция", "Город", "Телефон", "Трекинг номер"]
@@ -297,18 +297,6 @@ def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
     old_order_id = ""
     old_flag = 0
 
-    # генерация списка номеров строк для обединениия
-    logger.info("generate list of index to marge")
-    for index in range(len(out_df["Номер заказа"])):
-        order_id = out_df["Номер заказа"][index]
-        if order_id == old_order_id and old_flag == 0:
-            index_list.append(index+1)
-            old_flag = 1
-        if order_id != old_order_id and old_flag == 1:
-            index_list.append(index+1)
-            old_flag = 0
-        old_order_id = order_id
-
     # востановление порядка индексов после вставок датафреймов
     out_df = out_df.reset_index(drop=True)
 
@@ -328,6 +316,19 @@ def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
         dictionary_to_write["Номер трекинга"] = out_df["Номер трекинга"][index]
         temp_df = temp_df.append(dictionary_to_write, ignore_index=True)
     out_df = temp_df
+
+    # генерация списка номеров строк для обединениия
+    logger.info("generate list of index to marge")
+    for index in range(len(out_df["Номер заказа"])):
+        order_id = out_df["Номер заказа"][index]
+        # print(out_df["Имя получателя"][index], index)
+        if order_id == old_order_id and old_flag == 0:
+            index_list.append(index+1)
+            old_flag = 1
+        if order_id != old_order_id and old_flag == 1:
+            index_list.append(index+1)
+            old_flag = 0
+        old_order_id = order_id
 
     # собираем индексы ячеек столбца трек-номер который следует выделить жирным
     old_phone = ""
@@ -354,9 +355,9 @@ def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
 
     logger.info(msg=f'data was saved to {name_of_table}')
 
-    make_merge(index_list, name_of_table)
-
     make_table_style_parcels_xlsx(name_of_table, count_list, index_phone_list)
+
+    make_merge(index_list, name_of_table)
 
     os.chdir("../")
 
@@ -512,8 +513,13 @@ def make_table_style_parcels_xlsx(name, count_list, index_phone_list):
 
     # тут выделяем жирнвм трек-номера посылок с одинаковыми номерами телефонов
     logger.info("make track-number bold")
-    for index in index_phone_list:
-        sheet['I' + str(index)].font = Font(bold=True)
+    for index in range(0, len(index_phone_list), 2):
+        if len(range(index_phone_list[index], index_phone_list[index+1])) == 1:
+            sheet['I' + str(index_phone_list[index])].font = Font(bold=True)
+            sheet['I' + str(index_phone_list[index+1])].font = Font(bold=True)
+        else:
+            for sub_index in range(index_phone_list[index], index_phone_list[index+1]):
+                sheet['I' + str(sub_index+1)].font = Font(bold=True)
 
     work_book.save(name)
 
@@ -521,7 +527,7 @@ def make_table_style_parcels_xlsx(name, count_list, index_phone_list):
 # создание обединенных ячеек таблице
 def make_merge(index_list, name):
     # Буквы столбцов в которых одинаковые данные должны объединяться
-    merge_letters = ['A', 'B', 'E', 'F', 'G', 'H', 'I', 'J']
+    merge_letters = ['A', 'B', 'E', 'F', 'G', 'H', 'I']
     work_book = op.load_workbook(name)
     sheet = work_book.active
     logger.info("make cells merge")
