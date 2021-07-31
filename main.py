@@ -204,7 +204,7 @@ def generate_products_xlsx(frame_of_tables, name_of_table, path='.'):
                     list_of_articles = frame_with_articles['Артикул'][second_index].split("\n")
                     for third_index in range(len(list_of_names)):
                         if name in list_of_names[third_index] and list_of_articles[third_index] != '':
-                            df_to_save.loc[index, 'Артикул'] = list_of_articles[third_index]
+                            df_to_save.loc[index, 'Артикул'] = list_of_articles[third_index].split(" * ")[0]
                         else:
                             df_to_save.loc[index, 'Артикул'] = None
                 else:
