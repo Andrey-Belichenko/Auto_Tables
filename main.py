@@ -27,13 +27,20 @@ def create_logger(log_file_name, path='.'):
         my_file = open(log_file_name, "w+")
         my_file.close()
 
-    logger.basicConfig(filename=log_file_name, level=logger.INFO)
+    file_log = logger.FileHandler(log_file_name)
+    console_out = logger.StreamHandler()
+
+    logger.basicConfig(handlers=(file_log, console_out),
+                       format='[%(asctime)s | %(levelname)s]: %(message)s',
+                       datefmt='%m.%d.%Y %H:%M:%S',
+                       level=logger.INFO)
     # возврат в корневую директорию проекта
     os.chdir("../")
 
 
 # получение списка таблиц в папке
 def get_tables(file_mask, path='.'):
+    logger.info("start reading input files")
     if not os.path.exists(path):
         logger.warning(msg=f'folder {path} does not exist')
         quit()
@@ -95,8 +102,7 @@ def parsing_tables(tables_list, path='.'):
                 # ignore_index=True для того что бы запись дополнительно не индексировалаь (не добавлялся индекс в начало)
                 frame_of_tables = frame_of_tables.append(dictionary_to_write, ignore_index=True)
     # frame_of_tables["Имя таблицы"] = list_of_tabs
-    logger.info("large shared table was generated :")
-    logger.info(frame_of_tables)
+    logger.info("large shared table was generated")
     # возврат в корневую директорию проекта
     os.chdir("../")
     return frame_of_tables
@@ -107,8 +113,9 @@ def generate_products_xlsx(frame_of_tables, name_of_table, path='.'):
     # Поля которые необходимо включить в таблицу Товары.xlsx
     # Товары|Артикул|Количество
     data_frame_goods = pd.DataFrame({'Товары': [], 'Количество': []})
+    frame_with_articles = frame_of_tables[['Товары', 'Артикул']]
     frame_of_tables = frame_of_tables[['Товары']]
-    df_to_save = pd.DataFrame({'Товары': [], 'Количество': []})
+    df_to_save = pd.DataFrame({'Товары': [], 'Количество': [], 'Артикул': []})
     names = []
     nums = []
     dictionary_to_write = {'Товары': 0, 'Количество': 0}
@@ -174,12 +181,37 @@ def generate_products_xlsx(frame_of_tables, name_of_table, path='.'):
         # ignore_index=True для того что бы запись дополнительно не индексировалаь (не добавлялся индекс в начало)
         df_to_save = df_to_save.append(dictionary_to_write, ignore_index=True)
 
-    logger.info(df_to_save)
     logger.info("table goods was generated")
-    # index=False для записи в excel без доп. индексов
-    df_to_save = df_to_save[['Товары', 'Количество']].sort_values(by='Товары')
 
-    df_to_save[['Товары', 'Количество']].to_excel(name_of_table, index=False)
+    # сортировка по алфавиту в столбце товары
+    logger.info("table sorting ...")
+    df_to_save = df_to_save[['Товары', 'Количество']].sort_values(by='Товары')
+    # index=False для записи в excel без доп. индексов
+    logger.info("table was sorted")
+
+    # generate col articles
+    logger.info("generate articles col")
+    # сдесь генерируем столбец артиклов
+    for index in range(len(df_to_save['Товары'])):
+        name = df_to_save['Товары'][index]
+        for second_index in range(len(frame_with_articles['Товары'])):
+            # сверяем кол-во завершающих строку символов те сверяем количество имен товаров и артиклов
+            # тем самым можем понять можно ли однозначно опредилить артикул
+            if name in frame_with_articles['Товары'][second_index]:
+                if frame_with_articles['Товары'][second_index].count('\n') == \
+                        frame_with_articles['Артикул'][second_index].count('\n'):
+                    list_of_names = frame_with_articles['Товары'][second_index].split("\n")
+                    list_of_articles = frame_with_articles['Артикул'][second_index].split("\n")
+                    for third_index in range(len(list_of_names)):
+                        if name in list_of_names[third_index] and list_of_articles[third_index] != '':
+                            df_to_save.loc[index, 'Артикул'] = list_of_articles[third_index]
+                        else:
+                            df_to_save.loc[index, 'Артикул'] = None
+                else:
+                    df_to_save.loc[index, 'Артикул'] = None
+    logger.info("col articles was generated successfully")
+
+    df_to_save[['Товары', 'Количество', 'Артикул']].to_excel(name_of_table, index=False)
 
     logger.info(msg=f'data was saved to {name_of_table}')
     make_table_style_products_xlsx(name_of_table)
@@ -259,7 +291,7 @@ def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
         obj = frame_of_tables["Товары"][index]
         if obj.count('\n') > 0:
             obj_list = obj.split('\n')
-            len_list.append(index+len(obj_list))
+            len_list.append(index + len(obj_list))
             for one in obj_list:
                 name = one[4:one.find("- Количество: ")]
                 # print(name)
@@ -323,10 +355,10 @@ def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
         order_id = out_df["Номер заказа"][index]
         # print(out_df["Имя получателя"][index], index)
         if order_id == old_order_id and old_flag == 0:
-            index_list.append(index+1)
+            index_list.append(index + 1)
             old_flag = 1
         if order_id != old_order_id and old_flag == 1:
-            index_list.append(index+1)
+            index_list.append(index + 1)
             old_flag = 0
         old_order_id = order_id
 
@@ -335,10 +367,10 @@ def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
     for index in range(len(out_df["Телефон"])):
         phone = out_df["Телефон"][index]
         if phone == old_phone and old_flag == 0:
-            index_phone_list.append(index+1)
+            index_phone_list.append(index + 1)
             old_flag = 1
         if phone != old_phone and old_flag == 1:
-            index_phone_list.append(index+1)
+            index_phone_list.append(index + 1)
             old_flag = 0
         old_phone = phone
     out_df = out_df.reset_index(drop=True)
@@ -465,13 +497,12 @@ def create_sqlite_table(conn):
 # приведение таблицы товары к соответствующему виду
 def make_table_style_products_xlsx(name):
     work_book = op.load_workbook(name)
-    col_letters = ['A', 'B']  # список букв колонок
+    col_letters = ['A', 'B', 'C']  # список букв колонок
     sheet = work_book.active
     for letter in col_letters:
         if letter == 'A':
             # изменение щирины колонки A
             sheet.column_dimensions[letter].width = 130
-
     work_book.save(name)
 
 
@@ -509,17 +540,17 @@ def make_table_style_parcels_xlsx(name, count_list, index_phone_list):
     logger.info("make count bold")
     for index in count_list:
         # index + 2 тк из-за наложения форматоыв индекс чутьчуть плывет
-        sheet['D'+str(index+2)].font = Font(bold=True)
+        sheet['D' + str(index + 2)].font = Font(bold=True)
 
     # тут выделяем жирнвм трек-номера посылок с одинаковыми номерами телефонов
     logger.info("make track-number bold")
     for index in range(0, len(index_phone_list), 2):
-        if len(range(index_phone_list[index], index_phone_list[index+1])) == 1:
+        if len(range(index_phone_list[index], index_phone_list[index + 1])) == 1:
             sheet['I' + str(index_phone_list[index])].font = Font(bold=True)
-            sheet['I' + str(index_phone_list[index+1])].font = Font(bold=True)
+            sheet['I' + str(index_phone_list[index + 1])].font = Font(bold=True)
         else:
-            for sub_index in range(index_phone_list[index], index_phone_list[index+1]):
-                sheet['I' + str(sub_index+1)].font = Font(bold=True)
+            for sub_index in range(index_phone_list[index], index_phone_list[index + 1]):
+                sheet['I' + str(sub_index + 1)].font = Font(bold=True)
 
     work_book.save(name)
 
@@ -535,7 +566,7 @@ def make_merge(index_list, name):
         # выбираем из списка индексы с шагом 2 тк каждый 2 закрывающий
         for index in range(0, len(index_list), 2):
             # строка обединениея передаем в sheet.merge_cells строку вида "БУКВА+ЦИФРА:БУКВА+ЦИФРА" ("A1:A4")
-            sheet.merge_cells(letter+str(index_list[index])+':'+letter+str(index_list[index+1]))
+            sheet.merge_cells(letter + str(index_list[index]) + ':' + letter + str(index_list[index + 1]))
     work_book.save(name)
 
 
