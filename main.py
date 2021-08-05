@@ -9,16 +9,24 @@ import openpyxl as op
 from openpyxl.styles import PatternFill, Border, Side, Alignment, Font
 
 
-# добавление текущей даты к названию таблицы
 def rename_table(name_of_table):
+    """
+    добавление текущей даты к названию таблицы
+    :param name_of_table: имя таблицы
+    :return: имя таблицы + текущая дата
+    """
     name_of_table = name_of_table.replace(".xlsx", "")
     name_of_table = name_of_table + "_" + str(datetime.datetime.now().date())
     name_of_table = name_of_table + ".xlsx"
     return name_of_table
 
 
-# Создание файла для записи логов
 def create_logger(log_file_name, path='.'):
+    """
+    Создание и настройка логгера
+    :param log_file_name: имя файла для записи логов
+    :param path:
+    """
     if not os.path.exists(path):
         os.mkdir(path)
     os.chdir(path)
@@ -38,8 +46,13 @@ def create_logger(log_file_name, path='.'):
     os.chdir("../")
 
 
-# получение списка таблиц в папке
 def get_tables(file_mask, path='.'):
+    """
+    получение списка таблиц в path
+    :param file_mask: маска поиска файлов
+    :param path:
+    :return: список имен файлов в виде list
+    """
     logger.info("start reading input files")
     if not os.path.exists(path):
         logger.warning(msg=f'folder {path} does not exist')
@@ -48,7 +61,7 @@ def get_tables(file_mask, path='.'):
     os.chdir(path)
     tables_list = []
     for file in os.listdir():
-        if file.find(file_mask):
+        if file.find(file_mask) != -1:
             tables_list.append(file)
 
     if len(tables_list) == 0:
@@ -62,8 +75,13 @@ def get_tables(file_mask, path='.'):
     return tables_list
 
 
-# парсинг таблиц и сборка большой общей таблицы
 def parsing_tables(tables_list, path='.'):
+    """
+    Функция создания общей таблицы с данными из файлов input
+    :param tables_list: список с названиями файлов входных таблиц
+    :param path:
+    :return: общаяя таблица в формате pandas dataframe
+    """
     # список заголовков большой общей таблицы
     list_of_headers = ["Номер заказа", "Статус", "Время создания заказа", "Время оплаты", "Стоимость товаров, Руб",
                        "Стоимость доставки, Руб", "Сумма заказа, Руб", "Скидка магазина, Руб", "Оплачено клиентом, Руб",
@@ -92,14 +110,22 @@ def parsing_tables(tables_list, path='.'):
             for row in sheet.iter_rows(min_row=min_row, min_col=min_col, max_row=max_row, max_col=max_col):
                 index_of_headers = 0
                 for cell in row:
-                    if cell.value is not None:
-                        if cell.value == "":
-                            dictionary_to_write[list_of_headers[index_of_headers]] = ""
-                        else:
-                            dictionary_to_write[list_of_headers[index_of_headers]] = cell.value
+                    if cell.value == "":
+                        dictionary_to_write[list_of_headers[index_of_headers]] = ""
+                    else:
+                        dictionary_to_write[list_of_headers[index_of_headers]] = cell.value
+                        if list_of_headers[index_of_headers] == 'Товары':
+
+                            dictionary_to_write[list_of_headers[index_of_headers]] =\
+                                dictionary_to_write[list_of_headers[index_of_headers]].\
+                                replace("(Ships From: Russian Federation)", "")
+
+                            dictionary_to_write[list_of_headers[index_of_headers]] = \
+                                dictionary_to_write[list_of_headers[index_of_headers]]. \
+                                replace("; Ships From: Russian Federation", "")
                     index_of_headers += 1
                     dictionary_to_write["Статус"] = table
-                # ignore_index=True для того что бы запись дополнительно не индексировалаь (не добавлялся индекс в начало)
+                # ignore_index=True запись в dataframe без индекса
                 frame_of_tables = frame_of_tables.append(dictionary_to_write, ignore_index=True)
     # frame_of_tables["Имя таблицы"] = list_of_tabs
     logger.info("large shared table was generated")
@@ -108,8 +134,14 @@ def parsing_tables(tables_list, path='.'):
     return frame_of_tables
 
 
-# создание и запись таблицы товары
 def generate_products_xlsx(frame_of_tables, name_of_table, path='.'):
+    """
+      создание и запись таблицы товары
+      :param frame_of_tables: большая таблица со всеми данными
+      :param name_of_table: имя таблицы для сохранение
+      :param path:
+      :return:
+      """
     # Поля которые необходимо включить в таблицу Товары.xlsx
     # Товары|Артикул|Количество
     data_frame_goods = pd.DataFrame({'Товары': [], 'Количество': []})
@@ -219,8 +251,14 @@ def generate_products_xlsx(frame_of_tables, name_of_table, path='.'):
     os.chdir("../")
 
 
-# создание и запись таблицы посылки
 def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
+    """
+    создание и запись таблицы посылки
+    :param frame_of_tables: большая таблица со всеми данными
+    :param name_of_table: имя таблицы для сохранение
+    :param path:
+    :return:
+    """
     # Поля таблицы Посылки.xlsx
     # Номер заказа | Статус | Время создания заказа | Время оплаты | Стоимость Товаров | Стоимость доставки
     # | Сумма заказа| Скидка магазина | Оплачено клиентом | Сумма возврата | Возвраты | Товары
@@ -254,7 +292,6 @@ def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
     temp_df = pd.DataFrame(out_template_dict)
 
     dict_to_out = {header: list() for header in output_list}
-    out_df = pd.DataFrame(dict_to_out)
 
     if not os.path.exists(path):
         os.mkdir(path)
@@ -394,8 +431,15 @@ def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
     os.chdir("../")
 
 
-# подключение к базе данных SQLite
+def generate_tracking_xlsx():
+    pass
+
+
 def create_connection(path):
+    """
+     подключение к базе данных SQLite
+    :param path:
+    """
     try:
         connection = sqlite3.connect(path)
         logger.info("Connection to SQLite DB successful")
@@ -407,24 +451,38 @@ def create_connection(path):
         quit()
 
 
-# исполнение запроса SQLite и сохранение изменений
 def execute_query(connection, query):
+    """
+    исполнение запроса SQLite и сохранение изменений
+    :param connection: ваше подключение к БД
+    :param query: команда БД для исполнения
+    """
     cursor = connection.cursor()
     cursor.execute(query)
     connection.commit()
 
 
-# создание юазы данных SQLite
 def generate_sqlite(name, path='.'):
+    """
+    создание юазы данных SQLite
+    :param name: имя БД
+    :param path:
+    :return: connection, name
+    """
     if not os.path.exists(path):
         os.mkdir(path)
     os.chdir(path)
     connection = create_connection(name)
+    os.chdir('../')
     return connection, name
 
 
-# запись данных в таблицу БД SQLite
 def dataframe_to_sqlite(frame_of_tables, conn):
+    """
+     запись данных в таблицу БД SQLite
+    :param frame_of_tables:  большая сводная таблица pandas dataframe
+    :param conn: подключение SQLite
+    """
     list_of_headers = ["order_id", "status", "order_credit_dt", "pay_dt", "goods_cost", "delivery_cost",
                        "order_cost", "shop_discount", "customer_paid", "refund", "returns", "products",
                        "products_articles", "product_ids", "buyer_note", "seller_note", "delivery_name",
@@ -458,8 +516,11 @@ def dataframe_to_sqlite(frame_of_tables, conn):
     logger.info(msg=f'database {db_name} successfully')
 
 
-# создание таблицы в БД SQLite
 def create_sqlite_table(conn):
+    """
+    создание таблицы в БД SQLite с использованием запроса SQLite
+    :param conn: подключение SQLite
+    """
     cursor = conn.cursor()
     cursor.execute("""CREATE TABLE IF NOT EXISTS orders(
                             order_id VARCHAR(16), 
@@ -494,8 +555,11 @@ def create_sqlite_table(conn):
     conn.commit()
 
 
-# приведение таблицы товары к соответствующему виду
 def make_table_style_products_xlsx(name):
+    """
+    приведение таблицы товары к соответствующему виду
+    :param name: имя xlsx файла
+    """
     work_book = op.load_workbook(name)
     col_letters = ['A', 'B', 'C']  # список букв колонок
     sheet = work_book.active
@@ -506,8 +570,13 @@ def make_table_style_products_xlsx(name):
     work_book.save(name)
 
 
-# приведение таблицы посылки к соответствующему виду
 def make_table_style_parcels_xlsx(name, count_list, index_phone_list):
+    """
+    приведение таблицы посылки к соответствующему виду
+    :param name: имя xlsx файла
+    :param count_list: список индексов для выделения жирным количества больше 1
+    :param index_phone_list: список индексов для выделения трек-номера посылок с одинаковыми номерами телефонов
+    """
     work_book = op.load_workbook(name)
     # col_letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']  # список букв колонок
     col_letters = {'A': 16.44, 'B': 1, 'C': 57, 'D': 2.56, 'E': 15.89, 'F': 15.89, 'G': 13.11, 'H': 14.33, 'I': 14.33}
@@ -538,7 +607,10 @@ def make_table_style_parcels_xlsx(name, count_list, index_phone_list):
 
     # тут выделяем жирным количество больше 1
     logger.info("make count bold")
+    coll_d = sheet['D']
     for index in count_list:
+        # index + 1 для преревода в отчет от 1 а не от 0
+        coll_d[index + 1].fill = PatternFill(start_color="D8D8D8", end_color="D8D8D8", fill_type="solid")
         # index + 2 тк из-за наложения форматоыв индекс чутьчуть плывет
         sheet['D' + str(index + 2)].font = Font(bold=True)
 
@@ -555,8 +627,13 @@ def make_table_style_parcels_xlsx(name, count_list, index_phone_list):
     work_book.save(name)
 
 
-# создание обединенных ячеек таблице
 def make_merge(index_list, name):
+    """
+    создание объединенных ячеек таблице
+    :param index_list: список индексов для объединения ячеек
+    :param name: имя xlsx файла
+    :return:
+    """
     # Буквы столбцов в которых одинаковые данные должны объединяться
     merge_letters = ['A', 'B', 'E', 'F', 'G', 'H', 'I']
     work_book = op.load_workbook(name)
@@ -570,8 +647,12 @@ def make_merge(index_list, name):
     work_book.save(name)
 
 
-# сортировка списка по наличию одинаковых номеров телефонов
 def pars_coll_numbers(out_df):
+    """
+    сортировка списка по наличию одинаковых номеров телефонов
+    :param out_df: выходной dataframe
+    :return: список индексов под сдвиг
+    """
     phone_list = out_df['Телефон']
     phone_list = phone_list.to_list()
     list_of_index = []
@@ -589,6 +670,23 @@ def pars_coll_numbers(out_df):
     return list_of_index
 
 
+def move_old_files(list_of_tables_loc, archive_path='Archive', input_path='input'):
+    """
+    Функция перемещает старые входные файлы в архив
+    :param list_of_tables_loc : список имен xlsx файлов
+    :param archive_path: имя папки архива
+    :param input_path: имя папки с входнами данными
+    """
+    if not os.path.exists(archive_path):
+        os.makedirs(archive_path)
+        logger.info(f"folder {archive_path} was created")
+
+    logger.info("moving old files to archive folder")
+    for name in list_of_tables_loc:
+        logger.info(input_path+"/"+name+" -> "+archive_path+"/"+name)
+        os.rename(input_path+"/"+name, archive_path+"/"+name)
+
+
 if __name__ == '__main__':
     create_logger("logs.log", "logger")
     list_of_tables = get_tables(".xlsx", "input")
@@ -598,4 +696,5 @@ if __name__ == '__main__':
     connect, db_name = generate_sqlite("out.db", "output")
     create_sqlite_table(connect)
     dataframe_to_sqlite(frame_of_tables_g, connect)
+    #move_old_files(list_of_tables, 'Archive', 'input')
     logger.info('the program ended successfully')
