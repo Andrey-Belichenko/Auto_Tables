@@ -98,35 +98,34 @@ def parsing_tables(tables_list, path='.'):
     os.chdir(path)
     logger.info("start generating a large shared table")
 
+    start_row = 5  # Минимальное значения строк данного листа книги
+    start_col = 1  # Минимальное значения строк данного листа книги
+
     # добавление новых значений в словарь и dataframe
     for table in tables_list:
         work_book = op.load_workbook(table)
-        for name in work_book.sheetnames:
-            sheet = work_book[name]
-            min_row = 5  # Минимальное значения строк данного листа книги
-            min_col = 1  # Минимальное значения строк данного листа книги
-            max_row = sheet.max_row  # Получение максимального значения строк данного листа книги
-            max_col = sheet.max_column  # Получение максимального столбцов строк данного листа книги
-            for row in sheet.iter_rows(min_row=min_row, min_col=min_col, max_row=max_row, max_col=max_col):
-                index_of_headers = 0
-                for cell in row:
-                    if cell.value == "":
-                        dictionary_to_write[list_of_headers[index_of_headers]] = ""
-                    else:
-                        dictionary_to_write[list_of_headers[index_of_headers]] = cell.value
-                        if list_of_headers[index_of_headers] == 'Товары':
+        sheet = work_book["sheet1"]
+        max_row = sheet.max_row  # Получение максимального значения строк данного листа книги
+        max_col = sheet.max_column  # Получение максимального столбцов строк данного листа книги
+        for row in sheet.iter_rows(min_row=start_row, min_col=start_col, max_row=max_row, max_col=max_col):
+            index_of_headers = 0
+            for cell in row:
+                if cell.value == "":
+                    dictionary_to_write[list_of_headers[index_of_headers]] = ""
+                else:
+                    dictionary_to_write[list_of_headers[index_of_headers]] = cell.value
+                    if list_of_headers[index_of_headers] == 'Товары':
+                        dictionary_to_write[list_of_headers[index_of_headers]] =\
+                            dictionary_to_write[list_of_headers[index_of_headers]].\
+                            replace("(Ships From: Russian Federation)", "")
 
-                            dictionary_to_write[list_of_headers[index_of_headers]] =\
-                                dictionary_to_write[list_of_headers[index_of_headers]].\
-                                replace("(Ships From: Russian Federation)", "")
-
-                            dictionary_to_write[list_of_headers[index_of_headers]] = \
-                                dictionary_to_write[list_of_headers[index_of_headers]]. \
-                                replace("; Ships From: Russian Federation", "")
-                    index_of_headers += 1
-                    dictionary_to_write["Статус"] = table
+                        dictionary_to_write[list_of_headers[index_of_headers]] = \
+                            dictionary_to_write[list_of_headers[index_of_headers]]. \
+                            replace("; Ships From: Russian Federation", "")
+                index_of_headers += 1
+                dictionary_to_write["Статус"] = table
                 # ignore_index=True запись в dataframe без индекса
-                frame_of_tables = frame_of_tables.append(dictionary_to_write, ignore_index=True)
+            frame_of_tables = frame_of_tables.append(dictionary_to_write, ignore_index=True)
     # frame_of_tables["Имя таблицы"] = list_of_tabs
     logger.info("large shared table was generated")
     # возврат в корневую директорию проекта
@@ -431,8 +430,63 @@ def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
     os.chdir("../")
 
 
-def generate_tracking_xlsx():
-    pass
+def generate_tracking_xlsx(frame_of_tables, list_of_tables_loc, path='.'):
+    """
+    Создание таблиц с трек-номерами для работы с aliexpress
+    :param frame_of_tables: большой dataframe со всеми данными
+    :param list_of_tables_loc: список имен файлов содержаших таблицы
+    :param path:
+    """
+
+    list_of_headers_eng = ['Order Number',  'Logistics Company', 'Tracking Number']
+
+    const_value_dict = {'Статус': "Full Shipment", 'Заметка': "",
+                        'Сайт трекинга': "http://www.russianpost.ru/tracking20/"}
+
+    template_dict = {header: list() for header in list_of_headers_eng}
+
+    df_to_write = pd.DataFrame(template_dict)
+
+    # дополнительная чать имени файла с трекинг таблицами
+    file_name_add = "- butch send.xlsx"
+
+    if not os.path.exists(path):
+        os.mkdir(path)
+
+    os.chdir(path)
+
+    for name in list_of_tables_loc:
+        name_of_table = name.replace(".xlsx", "")+file_name_add
+        if not os.path.exists(name_of_table):
+            logger.info(msg=f'{name_of_table}not found in directory /output')
+            logger.info(msg=f'File {name_of_table} creation')
+            wb = op.Workbook()
+            wb.save(filename=name_of_table)
+            logger.info(msg=f'Table {name_of_table} was created')
+        else:
+            logger.info(msg=f'{name_of_table} already created')
+            name_of_table = rename_table(name_of_table)
+            logger.info(msg=f'{name_of_table} create table with now date and time in name')
+            wb = op.Workbook()
+            wb.save(filename=name_of_table)
+        # выбираем из общей кучи только записи из конкретной таблицы
+        frame_of_tables_mod = frame_of_tables[frame_of_tables["Статус"].isin([name])]
+        frame_of_tables_mod = frame_of_tables_mod[["Номер заказа", "Способ доставки", "Трекинг номер"]]
+        logger.info(f"Create {name_of_table}")
+        for index in range(len(frame_of_tables_mod)):
+            # Заполняем таблицу с трекинга даннмыи
+            dict_to_write = \
+                dict(zip(list_of_headers_eng,
+                         frame_of_tables_mod.iloc[index]))
+            dict_to_write['Delivery Status'] = const_value_dict['Статус']
+            dict_to_write['Remark'] = const_value_dict['Заметка']
+            dict_to_write['Tracking website'] = const_value_dict['Сайт трекинга']
+            df_to_write = df_to_write.append(dict_to_write, ignore_index=True)
+        df_to_write.to_excel(name_of_table, index=False)
+        df_to_write = df_to_write.iloc[0:0]
+        make_table_style_tracking_xlsx(name_of_table)
+
+    os.chdir('../')
 
 
 def create_connection(path):
@@ -627,6 +681,43 @@ def make_table_style_parcels_xlsx(name, count_list, index_phone_list):
     work_book.save(name)
 
 
+def make_table_style_tracking_xlsx(name):
+    """
+    Задание необходимых стилей таблицам с трек-номерами
+    :param name: имя таблицы
+    """
+    work_book = op.load_workbook(name)
+
+    col_let = ['A', 'B', 'C', 'D', 'E', 'F']
+
+    sheet = work_book.active
+
+    # настройка ширины столбцов в таблице
+    logger.info(f"make styles in {name}")
+    for letter in col_let:
+        sheet.column_dimensions[letter].width = 31.1
+
+    # задача параметров текста в ячейках
+    for letter in col_let:
+        for cell in sheet[letter]:
+            if letter == 'A' or letter == 'D':
+                cell.font = Font(name="Colibri", size=11)
+            else:
+                cell.font = Font(name="Arial", size=10)
+            cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+
+    # сдесь выделяем первую строку для настройки особых параметров
+    first_row = sheet[1]
+    for cell in first_row:
+        # настройка заливки цвет и тип
+        cell.fill = PatternFill(start_color="00CDFF", end_color="00CDFF", fill_type="solid")
+        # настройка шрифта жирность
+        cell.font = Font(name="Arial", size=12, color="810081", bold=True)
+        cell.alignment = Alignment(horizontal="center", vertical="top", wrap_text=True)
+
+    work_book.save(name)
+
+
 def make_merge(index_list, name):
     """
     создание объединенных ячеек таблице
@@ -693,8 +784,9 @@ if __name__ == '__main__':
     frame_of_tables_g = parsing_tables(list_of_tables, "input")
     generate_products_xlsx(frame_of_tables_g, "Товары.xlsx", "output")
     generate_parcels_xlsx(frame_of_tables_g, "Посылки.xlsx", "output")
+    generate_tracking_xlsx(frame_of_tables_g, list_of_tables, "output")
     connect, db_name = generate_sqlite("out.db", "output")
     create_sqlite_table(connect)
     dataframe_to_sqlite(frame_of_tables_g, connect)
-    #move_old_files(list_of_tables, 'Archive', 'input')
+    move_old_files(list_of_tables, 'Archive', 'input')
     logger.info('the program ended successfully')
