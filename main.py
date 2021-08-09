@@ -443,9 +443,13 @@ def generate_tracking_xlsx(frame_of_tables, list_of_tables_loc, path='.'):
     const_value_dict = {'Статус': "Full Shipment", 'Заметка': "",
                         'Сайт трекинга': "http://www.russianpost.ru/tracking20/"}
 
-    template_dict = {header: list() for header in list_of_headers_eng}
+    template_dict = {'Order Number': [], 'Delivery Status': [], 'Logistics Company': [], 'Tracking Number': [],
+                     'Remark': [], 'Tracking website': []}
 
     df_to_write = pd.DataFrame(template_dict)
+
+    dict_to_write = {'Order Number': 0, 'Delivery Status': 0, 'Logistics Company': 0, 'Tracking Number': 0,
+                     'Remark': 0, 'Tracking website': 0}
 
     # дополнительная чать имени файла с трекинг таблицами
     file_name_add = "- butch send.xlsx"
@@ -475,10 +479,11 @@ def generate_tracking_xlsx(frame_of_tables, list_of_tables_loc, path='.'):
         logger.info(f"Create {name_of_table}")
         for index in range(len(frame_of_tables_mod)):
             # Заполняем таблицу с трекинга даннмыи
-            dict_to_write = \
-                dict(zip(list_of_headers_eng,
-                         frame_of_tables_mod.iloc[index]))
+            list_of_df = frame_of_tables_mod.iloc[index].tolist()
+            dict_to_write['Order Number'] = list_of_df[0]
             dict_to_write['Delivery Status'] = const_value_dict['Статус']
+            dict_to_write['Logistics Company'] = list_of_df[1]
+            dict_to_write['Tracking Number'] = list_of_df[2]
             dict_to_write['Remark'] = const_value_dict['Заметка']
             dict_to_write['Tracking website'] = const_value_dict['Сайт трекинга']
             df_to_write = df_to_write.append(dict_to_write, ignore_index=True)
@@ -788,5 +793,5 @@ if __name__ == '__main__':
     connect, db_name = generate_sqlite("out.db", "output")
     create_sqlite_table(connect)
     dataframe_to_sqlite(frame_of_tables_g, connect)
-    move_old_files(list_of_tables, 'Archive', 'input')
+    # move_old_files(list_of_tables, 'Archive', 'input')
     logger.info('the program ended successfully')
