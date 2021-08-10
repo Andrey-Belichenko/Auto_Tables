@@ -280,7 +280,6 @@ def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
     index_list = []
     len_list = []
     count_list = []
-    index_phone_list = []
 
     template_dict = {header: list() for header in list_of_headers}
 
@@ -412,7 +411,7 @@ def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
 
     logger.info(msg=f'data was saved to {name_of_table}')
 
-    make_table_style_parcels_xlsx(name_of_table, count_list, index_phone_list)
+    make_table_style_parcels_xlsx(name_of_table, count_list)
 
     make_merge(index_list, name_of_table)
 
@@ -428,8 +427,6 @@ def generate_tracking_xlsx(frame_of_tables, list_of_tables_loc, path='.'):
     :param list_of_tables_loc: список имен файлов содержаших таблицы
     :param path:
     """
-
-    list_of_headers_eng = ['Order Number',  'Logistics Company', 'Tracking Number']
 
     const_value_dict = {'Статус': "Full Shipment", 'Заметка': "",
                         'Сайт трекинга': "http://www.russianpost.ru/tracking20/"}
@@ -620,12 +617,11 @@ def make_table_style_products_xlsx(name):
     work_book.save(name)
 
 
-def make_table_style_parcels_xlsx(name, count_list, index_phone_list):
+def make_table_style_parcels_xlsx(name, count_list):
     """
     приведение таблицы посылки к соответствующему виду
     :param name: имя xlsx файла
     :param count_list: список индексов для выделения жирным количества больше 1
-    :param index_phone_list: список индексов для выделения трек-номера посылок с одинаковыми номерами телефонов
     """
     work_book = op.load_workbook(name)
     # col_letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']  # список букв колонок
@@ -750,8 +746,6 @@ def pars_tracks(name):
 
         old_phone = current_phone
 
-
-
     # тут выделяем жирнвм трек-номера посылок с одинаковыми номерами телефонов
     logger.info("make track-number bold")
     for index in range(0, len(index_list), 2):
@@ -812,8 +806,8 @@ if __name__ == '__main__':
     generate_products_xlsx(frame_of_tables_g, "Товары.xlsx", "output")
     generate_parcels_xlsx(frame_of_tables_g, "Посылки.xlsx", "output")
     generate_tracking_xlsx(frame_of_tables_g, list_of_tables, "output")
-    # connect, db_name = generate_sqlite("out.db", "output")
-    # create_sqlite_table(connect)
-    # dataframe_to_sqlite(frame_of_tables_g, connect)
-    # move_old_files(list_of_tables, 'Archive', 'input')
+    connect, db_name = generate_sqlite("out.db", "output")
+    create_sqlite_table(connect)
+    dataframe_to_sqlite(frame_of_tables_g, connect)
+    move_old_files(list_of_tables, 'Archive', 'input')
     logger.info('the program ended successfully')
