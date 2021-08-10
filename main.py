@@ -398,17 +398,6 @@ def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
             old_flag = 0
         old_order_id = order_id
 
-    # собираем индексы ячеек столбца трек-номер который следует выделить жирным
-    old_phone = ""
-    for index in range(len(out_df["Телефон"])):
-        phone = out_df["Телефон"][index]
-        if phone == old_phone and old_flag == 0:
-            index_phone_list.append(index + 1)
-            old_flag = 1
-        if phone != old_phone and old_flag == 1:
-            index_phone_list.append(index + 1)
-            old_flag = 0
-        old_phone = phone
     out_df = out_df.reset_index(drop=True)
 
     # собираем список индексов которые надо выделить жирным
@@ -426,6 +415,8 @@ def generate_parcels_xlsx(frame_of_tables, name_of_table, path='.'):
     make_table_style_parcels_xlsx(name_of_table, count_list, index_phone_list)
 
     make_merge(index_list, name_of_table)
+
+    pars_tracks(name_of_table)
 
     os.chdir("../")
 
@@ -673,16 +664,6 @@ def make_table_style_parcels_xlsx(name, count_list, index_phone_list):
         # index + 2 тк из-за наложения форматоыв индекс чутьчуть плывет
         sheet['D' + str(index + 2)].font = Font(bold=True)
 
-    # тут выделяем жирнвм трек-номера посылок с одинаковыми номерами телефонов
-    logger.info("make track-number bold")
-    for index in range(0, len(index_phone_list), 2):
-        if len(range(index_phone_list[index], index_phone_list[index + 1])) == 1:
-            sheet['I' + str(index_phone_list[index])].font = Font(bold=True)
-            sheet['I' + str(index_phone_list[index + 1])].font = Font(bold=True)
-        else:
-            for sub_index in range(index_phone_list[index], index_phone_list[index + 1]):
-                sheet['I' + str(sub_index + 1)].font = Font(bold=True)
-
     work_book.save(name)
 
 
@@ -743,6 +724,47 @@ def make_merge(index_list, name):
     work_book.save(name)
 
 
+def pars_tracks(name):
+    """
+    функция выбирает и выделяет жирным трек номера заказов с одинаковыми номерами телефонов
+    :param name: имя файла содержащего таблицу
+    """
+    work_book = op.load_workbook(name)
+    sheet = work_book.active
+
+    old_phone = ""
+    old_flag = 0
+
+    index_list = []
+
+    column_with_phones = sheet['I']
+
+    for index in range(len(column_with_phones)):
+        current_phone = column_with_phones[index].value
+        if current_phone == old_phone and old_flag == 0:
+            index_list.append(index + 1)
+            old_flag = 1
+        if current_phone != old_phone and old_flag == 1:
+            index_list.append(index + 1)
+            old_flag = 0
+
+        old_phone = current_phone
+
+
+
+    # тут выделяем жирнвм трек-номера посылок с одинаковыми номерами телефонов
+    logger.info("make track-number bold")
+    for index in range(0, len(index_list), 2):
+        if index_list[index + 1] - index_list[index] == 1:
+            sheet['I' + str(index_list[index] - 1)].font = Font(bold=True)
+            sheet['I' + str(index_list[index + 1] - 1)].font = Font(bold=True)
+        else:
+            for sub_index in range(index_list[index], index_list[index + 1]+1):
+                sheet['I' + str(sub_index - 1)].font = Font(bold=True)
+
+    work_book.save(name)
+
+
 def pars_coll_numbers(out_df):
     """
     сортировка списка по наличию одинаковых номеров телефонов
@@ -790,8 +812,8 @@ if __name__ == '__main__':
     generate_products_xlsx(frame_of_tables_g, "Товары.xlsx", "output")
     generate_parcels_xlsx(frame_of_tables_g, "Посылки.xlsx", "output")
     generate_tracking_xlsx(frame_of_tables_g, list_of_tables, "output")
-    connect, db_name = generate_sqlite("out.db", "output")
-    create_sqlite_table(connect)
-    dataframe_to_sqlite(frame_of_tables_g, connect)
+    # connect, db_name = generate_sqlite("out.db", "output")
+    # create_sqlite_table(connect)
+    # dataframe_to_sqlite(frame_of_tables_g, connect)
     # move_old_files(list_of_tables, 'Archive', 'input')
     logger.info('the program ended successfully')
